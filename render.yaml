@@ -1,0 +1,14 @@
+# Render Blueprint: New > Blueprint > pick this repo. Or create a Web Service by hand
+# with the same build/start commands.
+services:
+  - type: web
+    name: hand-tracker-backend
+    runtime: python
+    plan: free
+    region: frankfurt   # closest Render region to Rwanda
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: API_KEY
+        generateValue: true   # Render makes a random key; copy it from the Environment tab

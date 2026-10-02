@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hand Tracker Body</title>
+<style>
+  :root { --bg:#f6f7fb; --card:#fff; --ink:#141a33; --muted:#6b7280; --line:#d6d9e4; --accent:#0ea5e9; --led:#facc15; --bad:#ef4444; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#0f1426; --card:#171d33; --ink:#e8ebf5; --muted:#9aa3b8; --line:#2c3452; --accent:#38bdf8; --led:#fde047; --bad:#f87171; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.4 system-ui, sans-serif; padding:16px; }
+  main { max-width:520px; margin:0 auto; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px; }
+  h1 { font-size:18px; margin:0 0 4px; }
+  p { margin:0 0 16px; color:var(--muted); font-size:13px; }
+  svg { width:100%; height:auto; display:block; }
+  .leds { display:flex; justify-content:space-between; gap:8px; margin:18px 0; }
+  .led { flex:1; aspect-ratio:1; max-width:64px; border-radius:50%; border:2px solid var(--line); background:var(--led); opacity:.08; transition:opacity .1s; }
+  .row { display:flex; flex-wrap:wrap; gap:6px 16px; font-variant-numeric:tabular-nums; font-size:14px; }
+  .bad { color:var(--bad); font-weight:600; }
+  button { margin-top:14px; padding:8px 14px; border-radius:8px; border:1px solid var(--line); background:transparent; color:var(--ink); cursor:pointer; font:inherit; }
+  code { font-size:12px; color:var(--muted); word-break:break-all; display:block; margin-top:12px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Fake body</h1>
+  <p>Polls <b>GET /hand</b> 5 times a second, like the ESP32 will, and shows what its servo and LEDs would do.</p>
+  <svg viewBox="0 0 200 110" aria-label="servo">
+    <path d="M10 100 A90 90 0 0 1 190 100" fill="none" stroke="var(--line)" stroke-width="2"/>
+    <text x="4" y="110" font-size="8" fill="var(--muted)">0°</text>
+    <text x="92" y="7" font-size="8" fill="var(--muted)">90°</text>
+    <text x="180" y="110" font-size="8" fill="var(--muted)">180°</text>
+    <line id="needle" x1="100" y1="100" x2="100" y2="18" stroke="var(--accent)" stroke-width="4" stroke-linecap="round"
+          style="transition:transform .15s linear; transform-origin:100px 100px"/>
+    <circle cx="100" cy="100" r="6" fill="var(--ink)"/>
+  </svg>
+  <div class="leds" id="leds"></div>
+  <div class="row" id="status">waiting…</div>
+  <button id="mode">Switch LED mode</button>
+  <code id="raw"></code>
+</main>
+<script>
+  const leds = document.getElementById("leds");
+  for (let i = 0; i < 5; i++) leds.appendChild(Object.assign(document.createElement("div"), { className: "led" }));
+  let mode = "fingers";
+
+  async function poll() {
+    try {
+      const r = await fetch("/hand", { cache: "no-store" });
+      const text = await r.text();
+      const s = JSON.parse(text);
+      mode = s.mode;
+      // Servo angle 0 points left (screen left), 180 points right.
+      document.getElementById("needle").style.transform = `rotate(${s.angle - 90}deg)`;
+      [...leds.children].forEach((el, i) => {
+        el.style.opacity = i < s.leds ? Math.max(0.08, s.brightness / 255) : 0.08;
+      });
+      document.getElementById("status").innerHTML =
+        `<span>angle <b>${s.angle}°</b></span><span>LEDs <b>${s.leds}</b> @ <b>${s.brightness}</b></span>` +
+        `<span>mode <b>${s.mode}</b></span>` +
+        (s.stale ? `<span class="bad">stale: brain silent</span>` : s.hand ? `<span>hand seen</span>` : `<span class="bad">no hand</span>`);
+      document.getElementById("raw").textContent = text;
+    } catch {
+      document.getElementById("status").innerHTML = `<span class="bad">backend unreachable</span>`;
+    }
+  }
+  setInterval(poll, 200);
+  poll();
+
+  document.getElementById("mode").onclick = () =>
+    fetch("/mode", { method: "POST", headers: { "Content-Type": "application/json" },
+                     body: JSON.stringify({ mode: mode === "fingers" ? "pinch" : "fingers" }) }).then(poll);
+</script>
+</body>
+</html>

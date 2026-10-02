@@ -1,0 +1,4 @@
+# The brain. Runs on WINDOWS (needs the webcam) with Python 3.10-3.12.
+mediapipe==0.10.14
+opencv-python
+requests
